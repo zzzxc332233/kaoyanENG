@@ -1,0 +1,6 @@
+gradio
+langchain
+langchain-openai
+python-dotenv
+tenacity
+pydantic
