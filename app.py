@@ -34,18 +34,18 @@ def format_report_html(result):
     
     # 总分
     score = result.get('score', 'N/A')
-    html += f'<div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 20px;"><h2>📊 总分: <span style="color: #2196F3; font-size: 1.5em;">{score}</span></h2></div>'
+    html += f'<div style="background: #2196F3; padding: 15px; border-radius: 5px; margin-bottom: 20px;"><h2>📊 总分: <span style="color: #F1F6F3; font-size: 1.5em;">{score}</span></h2></div>'
     
     report = result.get('report', {})
     
     # 整体分析
     overall = report.get('overall_analysis', {})
-    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px;">📋 整体分析</h3>'
+    html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px;">📋 整体分析</h3>'
     html += f'<p><strong>初印象：</strong>{overall.get("impression", "N/A")}</p>'
     
     # 词汇分析
     vocab = report.get('vocabulary', {})
-    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📚 词汇分析</h3>'
+    html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📚 词汇分析</h3>'
     
     highlight_words = vocab.get('highlight_words', [])
     if highlight_words:
@@ -63,7 +63,7 @@ def format_report_html(result):
     
     # 句型分析
     sentence = report.get('sentence_structure', {})
-    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">🔤 句型分析</h3>'
+    html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">🔤 句型分析</h3>'
     
     highlight_sentences = sentence.get('highlight_sentences', [])
     if highlight_sentences:
@@ -81,7 +81,7 @@ def format_report_html(result):
     
     # 篇章结构
     chapter = report.get('chapter_structure', {})
-    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📄 篇章结构</h3>'
+    html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📄 篇章结构</h3>'
     html += f'<p><strong>框架：</strong>{chapter.get("framework", "N/A")}</p>'
     html += f'<p><strong>完整性：</strong>{chapter.get("completeness", "N/A")}</p>'
     html += f'<p><strong>连贯性：</strong>{chapter.get("coherence", "N/A")}</p>'
@@ -89,7 +89,7 @@ def format_report_html(result):
     # 作文润色
     polish = result.get('polish', {})
     if polish:
-        html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">✨ 作文润色建议</h3>'
+        html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">✨ 作文润色建议</h3>'
         
         vocab_polish = polish.get('vocabulary_level', {})
         if vocab_polish.get('advanced_replacements'):
@@ -111,9 +111,9 @@ def format_report_html(result):
                 html += '</ul>'
         
         # 修订版
-        html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📝 修订版本</h3>'
+        html += '<h3 style="color: #F1F1FF; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📝 修订版本</h3>'
         revised = result.get('revised_version', '')
-        html += f'<div style="background: #fffacd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px;"><p>{revised}</p></div>'
+        html += f'<div style="background: #010110; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px;"><p>{revised}</p></div>'
     
     html += '</div>'
     return html
@@ -257,46 +257,36 @@ with gr.Blocks(title="考研英语 AI 批改系统") as ui:
     gr.Markdown("# 📝 考研英语 AI 批改系统（DeepSeek + LangChain）")
     gr.Markdown("---")
 
-    with gr.Tab("系统检测"):
+    with gr.Tab("英译汉"):
+        gr.Markdown("### 📖 输入")
+        t1 = gr.Textbox(label="原文（英文）", lines=8, placeholder="请输入要翻译的英文原文")
+        t2 = gr.Textbox(label="考生译文（中文）", lines=8, placeholder="请输入学生的中文翻译")
+        btn = gr.Button("批改", variant="primary", size="lg")
+        gr.Markdown("### 📋 批改结果")
+        out = gr.HTML(label="批改报告")
+        btn.click(eval_translation, [t1, t2], out)
+
+    with gr.Tab("小作文"):
+        gr.Markdown("### 📖 输入")
+        s1 = gr.Textbox(label="题目", lines=4, placeholder="请输入小作文题目")
+        s2 = gr.Textbox(label="考生作文", lines=12, placeholder="请输入学生的作文（约100词）")
+        btn2 = gr.Button("批改", variant="primary", size="lg")
+        gr.Markdown("### 📋 批改结果")
+        out2 = gr.HTML(label="批改报告")
+        btn2.click(eval_short, [s1, s2], out2)
+
+    with gr.Tab("大作文"):
+        gr.Markdown("### 📖 输入")
+        l1 = gr.Textbox(label="题目", lines=4, placeholder="请输入大作文题目")
+        l2 = gr.Textbox(label="考生作文", lines=18, placeholder="请输入学生的作文（约250词）")
+        btn3 = gr.Button("批改", variant="primary", size="lg")
+        gr.Markdown("### 📋 批改结果")
+        out3 = gr.HTML(label="批改报告")
+        btn3.click(eval_long, [l1, l2], out3)
+
+    with gr.Tab("API测试"):
         gr.Markdown("### 🔍 API 连接测试")
         test_btn = gr.Button("测试 API 连接", variant="primary")
         test_output = gr.JSON(label="测试结果")
         test_btn.click(test_api_connection, outputs=test_output)
-
-    with gr.Tab("英译汉"):
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("### 📖 输入")
-                t1 = gr.Textbox(label="原文（英文）", lines=8, placeholder="请输入要翻译的英文原文")
-                t2 = gr.Textbox(label="考生译文（中文）", lines=8, placeholder="请输入学生的中文翻译")
-                btn = gr.Button("批改", variant="primary", size="lg")
-            with gr.Column():
-                gr.Markdown("### 📋 批改结果")
-                out = gr.HTML(label="批改报告")
-        btn.click(eval_translation, [t1, t2], out)
-
-    with gr.Tab("小作文"):
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("### 📖 输入")
-                s1 = gr.Textbox(label="题目", lines=4, placeholder="请输入小作文题目")
-                s2 = gr.Textbox(label="考生作文", lines=12, placeholder="请输入学生的作文（约100词）")
-                btn2 = gr.Button("批改", variant="primary", size="lg")
-            with gr.Column():
-                gr.Markdown("### 📋 批改结果")
-                out2 = gr.HTML(label="批改报告")
-        btn2.click(eval_short, [s1, s2], out2)
-
-    with gr.Tab("大作文"):
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("### 📖 输入")
-                l1 = gr.Textbox(label="题目", lines=4, placeholder="请输入大作文题目")
-                l2 = gr.Textbox(label="考生作文", lines=18, placeholder="请输入学生的作文（约250词）")
-                btn3 = gr.Button("批改", variant="primary", size="lg")
-            with gr.Column():
-                gr.Markdown("### 📋 批改结果")
-                out3 = gr.HTML(label="批改报告")
-        btn3.click(eval_long, [l1, l2], out3)
-
 ui.launch()

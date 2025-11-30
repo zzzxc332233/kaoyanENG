@@ -1,4 +1,5 @@
 .vscode
 .env
 *.pyc
-__pycache__/
+__pycache__
+__pycache__/prompt.cpython-310.pyc
