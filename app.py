@@ -27,8 +27,46 @@ def format_report_html(result):
     if isinstance(result, dict) and "error" in result:
         return f'<div style="color: red; padding: 20px;"><h3>❌ 错误</h3><p>{result["error"]}</p></div>'
     
-    if not isinstance(result, dict) or "report" not in result:
+    # 支持两种输出格式：
+    # 1) 嵌套的 {"report": {...}}（详细结构）
+    # 2) 扁平结构 {"score":..., "errors": [...], "advice":..., "revised_version":...}
+    if not isinstance(result, dict):
         return f'<pre>{json.dumps(result, ensure_ascii=False, indent=2)}</pre>'
+
+    # 如果是扁平 schema（常见于简单翻译批改）
+    if "errors" in result and "report" not in result:
+        html = '<div style="font-family: Arial, sans-serif; line-height: 1.8;">'
+        score = result.get('score', 'N/A')
+        html += f'<div style="background: #2196F3; padding: 15px; border-radius: 5px; margin-bottom: 20px;"><h2>📊 总分: <span style="color: #F1F6F3; font-size: 1.5em;">{score}</span></h2></div>'
+
+        # 错误列表
+        errors = result.get('errors', [])
+        html += '<h3 style="border-bottom: 2px solid #2196F3; padding-bottom: 10px;">❗ 发现的问题</h3>'
+        if errors:
+            html += '<ul>'
+            for it in errors:
+                loc = it.get('loc', '')
+                etype = it.get('type', '')
+                detail = it.get('detail', '')
+                html += f'<li><strong>{loc}</strong> — <em>{etype}</em><br/><small>{detail}</small></li>'
+            html += '</ul>'
+        else:
+            html += '<p>未发现明显错误。</p>'
+
+        # 建议
+        advice = result.get('advice', '')
+        if advice:
+            html += '<h3 style="border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">💡 建议</h3>'
+            html += f'<p>{advice}</p>'
+
+        # 修订版本
+        revised = result.get('revised_version', '')
+        if revised:
+            html += '<h3 style="border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📝 修订版本</h3>'
+            html += f'<div style="background: #010110; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px;"><p>{revised}</p></div>'
+
+        html += '</div>'
+        return html
     
     html = '<div style="font-family: Arial, sans-serif; line-height: 1.8;">'
     
@@ -256,6 +294,27 @@ def eval_long(topic, stu):
 with gr.Blocks(title="考研英语 AI 批改系统") as ui:
     gr.Markdown("# 📝 考研英语 AI 批改系统（DeepSeek + LangChain）")
     gr.Markdown("---")
+    gr.HTML(r'''
+<style>
+:root { font-size: 20px; }
+body, .gradio-container { font-size: 20px !important; }
+textarea, input, .gr-textbox textarea, .gradio-textbox textarea, .gradio-input textarea, .gradio-textbox input { font-size: 18px !important; }
+input, textarea { caret-color: #222; }
+.gr-button, button { font-size: 18px !important; padding: 12px 18px !important; }
+/* 结果区字体放大以确保 HTML 内容（含 <pre>）随全局字号变化 */
+.gr-html, .gradio-html { font-size: 20px !important; }
+/* 单独设置结果区各级标题的字号（仅改字号，不改颜色或其它样式） */
+.gr-html h1, .gradio-html h1 { font-size: 28px !important; }
+.gr-html h2, .gradio-html h2 { font-size: 26px !important; }
+.gr-html h3, .gradio-html h3 { font-size: 22px !important; }
+.gr-html h4, .gradio-html h4 { font-size: 20px !important; }
+.gr-html h5, .gradio-html h5 { font-size: 18px !important; }
+.gr-html p, .gradio-html p, .gr-html li, .gradio-html li, .gr-html pre, .gradio-html pre { font-size: 30px !important; }
+.gr-html * {
+    font-size: 55px !important;
+}
+</style>
+''' )
 
     with gr.Tab("英译汉"):
         gr.Markdown("### 📖 输入")
