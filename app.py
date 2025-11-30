@@ -189,12 +189,13 @@ def test_api_connection():
     """测试是否能成功请求 DeepSeek API"""
     logger.info("🔍 开始测试 API 连接...")
     try:
-        test_message = HumanMessage(content="你好，请回复一句中国古诗")
+        test_message = HumanMessage(content="你好，请随机回复一句中国古诗")
         response = llm.invoke([test_message])
         logger.info(f"✅ API 连接成功!")
         return {
             "status": "success",
             "message": "API 连接成功",
+            "prompt": test_message.content,
             "response": response.content[:100] if response.content else "无响应"
         }
     except Exception as e:
@@ -246,11 +247,11 @@ def eval_translation(src, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [英译汉] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return format_report_html(result)
+        return format_report_html(result), result
     except Exception as e:
         logger.error(f"❌ [英译汉] 评估失败: {str(e)}", exc_info=True)
         error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
-        return error_html
+        return error_html, {"error": str(e)}
 
 def eval_short(topic, stu):
     logger.info("📝 [小作文] 开始评估")
@@ -265,11 +266,11 @@ def eval_short(topic, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [小作文] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return format_report_html(result)
+        return format_report_html(result), result
     except Exception as e:
         logger.error(f"❌ [小作文] 评估失败: {str(e)}", exc_info=True)
         error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
-        return error_html
+        return error_html, {"error": str(e)}
 
 def eval_long(topic, stu):
     logger.info("📝 [大作文] 开始评估")
@@ -284,11 +285,42 @@ def eval_long(topic, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [大作文] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return format_report_html(result)
+        return format_report_html(result), result
     except Exception as e:
         logger.error(f"❌ [大作文] 评估失败: {str(e)}", exc_info=True)
         error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
-        return error_html
+        return error_html, {"error": str(e)}
+
+
+# --- 日志存取辅助函数 ---
+LOG_DIR = "log"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+def _timestamped_filename(prefix: str):
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{prefix}_{ts}.json"
+
+def list_log_files(prefix=None):
+    try:
+        files = [f for f in os.listdir(LOG_DIR) if f.endswith('.json') and (prefix is None or f.startswith(prefix))]
+    except Exception:
+        return []
+    files.sort(reverse=True)
+    return files
+
+def save_log_file(prefix: str, payload: dict):
+    os.makedirs(LOG_DIR, exist_ok=True)
+    fn = _timestamped_filename(prefix)
+    path = os.path.join(LOG_DIR, fn)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    return fn
+
+def load_log_file(filename: str):
+    path = os.path.join(LOG_DIR, filename)
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 # --- WebUI ---
 with gr.Blocks(title="考研英语 AI 批改系统") as ui:
@@ -316,6 +348,7 @@ input, textarea { caret-color: #222; }
 </style>
 ''' )
 
+    # --- 翻译（英译汉）标签 ---
     with gr.Tab("英译汉"):
         gr.Markdown("### 📖 输入")
         t1 = gr.Textbox(label="原文（英文）", lines=8, placeholder="请输入要翻译的英文原文")
@@ -323,8 +356,51 @@ input, textarea { caret-color: #222; }
         btn = gr.Button("批改", variant="primary", size="lg")
         gr.Markdown("### 📋 批改结果")
         out = gr.HTML(label="批改报告")
-        btn.click(eval_translation, [t1, t2], out)
+        # 用 State 存储批改结果 JSON（比 JSON 组件更可靠）
+        trans_json = gr.State(value={})
+        # 日志文件下拉与保存/载入控件
+        tr_files = gr.Dropdown(choices=list_log_files('translation'), label="选择日志文件（json结果存放于./log）", interactive=True)
+        save_msg_t = gr.HTML(visible=True)
+        with gr.Row():
+            save_btn = gr.Button("保存批改结果", size="sm")
+            load_btn = gr.Button("载入结果", size="sm")
+            refresh_btn_t = gr.Button("🔄 刷新列表", size="sm")
 
+        # 批改按钮返回 HTML 与 JSON
+        btn.click(eval_translation, [t1, t2], [out, trans_json])
+
+        # 保存函数回调
+        def _save_translation(src, stu, result_json):
+            try:
+                # 检查 JSON 是否为空或 None - 必须先执行批改才能保存
+                if result_json is None or not result_json or result_json == {}:
+                    return '❌ 保存失败：尚未生成批改结果，请先点击"批改"按钮', gr.update()
+                payload = {"type": "translation", "src_text": src, "student_text": stu, "result": result_json}
+                fn = save_log_file("translation", payload)
+                choices = list_log_files('translation')
+                return f'✅ 已保存: {fn}', gr.update(choices=choices, value=fn)
+            except Exception as e:
+                return f'❌ 保存失败: {e}', None
+
+        def _load_translation(filename):
+            if not filename:
+                return "", "", "<div>未选择文件</div>", {}, "未选择文件"
+            try:
+                data = load_log_file(filename)
+                src = data.get('src_text', '')
+                stu = data.get('student_text', '')
+                res = data.get('result', {})
+                html = format_report_html(res)
+                return src, stu, html, res, f'✅ 已载入: {filename}'
+            except Exception as e:
+                return "", "", f"<div>载入失败: {e}</div>", {}, f'❌ 载入失败: {e}'
+
+        save_btn.click(_save_translation, [t1, t2, trans_json], [save_msg_t, tr_files])
+        load_btn.click(_load_translation, tr_files, [t1, t2, out, trans_json, save_msg_t])
+        # 刷新按钮：手动刷新下拉框列表
+        refresh_btn_t.click(lambda: gr.update(choices=list_log_files('translation')), outputs=tr_files)
+
+    # --- 小作文 ---
     with gr.Tab("小作文"):
         gr.Markdown("### 📖 输入")
         s1 = gr.Textbox(label="题目", lines=4, placeholder="请输入小作文题目")
@@ -332,8 +408,45 @@ input, textarea { caret-color: #222; }
         btn2 = gr.Button("批改", variant="primary", size="lg")
         gr.Markdown("### 📋 批改结果")
         out2 = gr.HTML(label="批改报告")
-        btn2.click(eval_short, [s1, s2], out2)
+        short_json = gr.State(value={})
+        sh_files = gr.Dropdown(choices=list_log_files('short'), label="选择日志文件（json结果存放于./log）", interactive=True)
+        save_msg_s = gr.HTML(visible=True)
+        with gr.Row():
+            save_btn_s = gr.Button("保存批改结果", size="sm")
+            load_btn_s = gr.Button("载入结果", size="sm")
+            refresh_btn_s = gr.Button("🔄 刷新列表", size="sm")
 
+        btn2.click(eval_short, [s1, s2], [out2, short_json])
+
+        def _save_short(topic, stu, result_json):
+            try:
+                if result_json is None or not result_json or result_json == {}:
+                    return '❌ 保存失败：尚未生成批改结果，请先点击"批改"按钮', gr.update()
+                payload = {"type": "short", "topic": topic, "student_text": stu, "result": result_json}
+                fn = save_log_file("short", payload)
+                choices = list_log_files('short')
+                return f'✅ 已保存: {fn}', gr.update(choices=choices, value=fn)
+            except Exception as e:
+                return f'❌ 保存失败: {e}', None
+
+        def _load_short(filename):
+            if not filename:
+                return "", "", "<div>未选择文件</div>", {}, "未选择文件"
+            try:
+                data = load_log_file(filename)
+                topic = data.get('topic', '')
+                stu = data.get('student_text', '')
+                res = data.get('result', {})
+                html = format_report_html(res)
+                return topic, stu, html, res, f'✅ 已载入: {filename}'
+            except Exception as e:
+                return "", "", f"<div>载入失败: {e}</div>", {}, f'❌ 载入失败: {e}'
+
+        save_btn_s.click(_save_short, [s1, s2, short_json], [save_msg_s, sh_files])
+        load_btn_s.click(_load_short, sh_files, [s1, s2, out2, short_json, save_msg_s])
+        refresh_btn_s.click(lambda: gr.update(choices=list_log_files('short')), outputs=sh_files)
+
+    # --- 大作文 ---
     with gr.Tab("大作文"):
         gr.Markdown("### 📖 输入")
         l1 = gr.Textbox(label="题目", lines=4, placeholder="请输入大作文题目")
@@ -341,7 +454,43 @@ input, textarea { caret-color: #222; }
         btn3 = gr.Button("批改", variant="primary", size="lg")
         gr.Markdown("### 📋 批改结果")
         out3 = gr.HTML(label="批改报告")
-        btn3.click(eval_long, [l1, l2], out3)
+        long_json = gr.State(value={})
+        lg_files = gr.Dropdown(choices=list_log_files('long'), label="选择日志文件（json结果存放于./log）", interactive=True)
+        save_msg_l = gr.HTML(visible=True)
+        with gr.Row():
+            save_btn_l = gr.Button("保存批改结果", size="sm")
+            load_btn_l = gr.Button("载入结果", size="sm")
+            refresh_btn_l = gr.Button("🔄 刷新列表", size="sm")
+
+        btn3.click(eval_long, [l1, l2], [out3, long_json])
+
+        def _save_long(topic, stu, result_json):
+            try:
+                if result_json is None or not result_json or result_json == {}:
+                    return '❌ 保存失败：尚未生成批改结果，请先点击"批改"按钮', gr.update()
+                payload = {"type": "long", "topic": topic, "student_text": stu, "result": result_json}
+                fn = save_log_file("long", payload)
+                choices = list_log_files('long')
+                return f'✅ 已保存: {fn}', gr.update(choices=choices, value=fn)
+            except Exception as e:
+                return f'❌ 保存失败: {e}', None
+
+        def _load_long(filename):
+            if not filename:
+                return "", "", "<div>未选择文件</div>", {}, "未选择文件"
+            try:
+                data = load_log_file(filename)
+                topic = data.get('topic', '')
+                stu = data.get('student_text', '')
+                res = data.get('result', {})
+                html = format_report_html(res)
+                return topic, stu, html, res, f'✅ 已载入: {filename}'
+            except Exception as e:
+                return "", "", f"<div>载入失败: {e}</div>", {}, f'❌ 载入失败: {e}'
+
+        save_btn_l.click(_save_long, [l1, l2, long_json], [save_msg_l, lg_files])
+        load_btn_l.click(_load_long, lg_files, [l1, l2, out3, long_json, save_msg_l])
+        refresh_btn_l.click(lambda: gr.update(choices=list_log_files('long')), outputs=lg_files)
 
     with gr.Tab("API测试"):
         gr.Markdown("### 🔍 API 连接测试")
