@@ -21,6 +21,103 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
+# --- 格式化显示函数 ---
+def format_report_html(result):
+    """将批改结果转换为 HTML 格式用于展示"""
+    if isinstance(result, dict) and "error" in result:
+        return f'<div style="color: red; padding: 20px;"><h3>❌ 错误</h3><p>{result["error"]}</p></div>'
+    
+    if not isinstance(result, dict) or "report" not in result:
+        return f'<pre>{json.dumps(result, ensure_ascii=False, indent=2)}</pre>'
+    
+    html = '<div style="font-family: Arial, sans-serif; line-height: 1.8;">'
+    
+    # 总分
+    score = result.get('score', 'N/A')
+    html += f'<div style="background: #f0f0f0; padding: 15px; border-radius: 5px; margin-bottom: 20px;"><h2>📊 总分: <span style="color: #2196F3; font-size: 1.5em;">{score}</span></h2></div>'
+    
+    report = result.get('report', {})
+    
+    # 整体分析
+    overall = report.get('overall_analysis', {})
+    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px;">📋 整体分析</h3>'
+    html += f'<p><strong>初印象：</strong>{overall.get("impression", "N/A")}</p>'
+    
+    # 词汇分析
+    vocab = report.get('vocabulary', {})
+    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📚 词汇分析</h3>'
+    
+    highlight_words = vocab.get('highlight_words', [])
+    if highlight_words:
+        html += '<h4>✨ 亮眼词汇</h4><ul>'
+        for item in highlight_words:
+            html += f'<li><strong>{item.get("word", "")}</strong>：{item.get("reason", "")}</li>'
+        html += '</ul>'
+    
+    spelling_errors = vocab.get('spelling_errors', [])
+    if spelling_errors:
+        html += '<h4>✏️ 拼写错误</h4><ul>'
+        for item in spelling_errors:
+            html += f'<li><strong>{item.get("error", "")}</strong> → <span style="color: green;"><strong>{item.get("correct", "")}</strong></span><br/><small>{item.get("explanation", "")}</small></li>'
+        html += '</ul>'
+    
+    # 句型分析
+    sentence = report.get('sentence_structure', {})
+    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">🔤 句型分析</h3>'
+    
+    highlight_sentences = sentence.get('highlight_sentences', [])
+    if highlight_sentences:
+        html += '<h4>✨ 优秀句子</h4><ul>'
+        for item in highlight_sentences:
+            html += f'<li><em>"{item.get("sentence", "")}"</em><br/><small>{item.get("reason", "")}</small></li>'
+        html += '</ul>'
+    
+    grammar_errors = sentence.get('grammar_errors', [])
+    if grammar_errors:
+        html += '<h4>❌ 语法错误</h4><ul>'
+        for item in grammar_errors:
+            html += f'<li><strong>错误：</strong> {item.get("error_sentence", "")}<br/><strong style="color: green;">修正：</strong> {item.get("corrected", "")}<br/><small>{item.get("explanation", "")}</small></li>'
+        html += '</ul>'
+    
+    # 篇章结构
+    chapter = report.get('chapter_structure', {})
+    html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📄 篇章结构</h3>'
+    html += f'<p><strong>框架：</strong>{chapter.get("framework", "N/A")}</p>'
+    html += f'<p><strong>完整性：</strong>{chapter.get("completeness", "N/A")}</p>'
+    html += f'<p><strong>连贯性：</strong>{chapter.get("coherence", "N/A")}</p>'
+    
+    # 作文润色
+    polish = result.get('polish', {})
+    if polish:
+        html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">✨ 作文润色建议</h3>'
+        
+        vocab_polish = polish.get('vocabulary_level', {})
+        if vocab_polish.get('advanced_replacements'):
+            html += '<h4>🔄 高级词汇替换</h4><ul>'
+            for item in vocab_polish['advanced_replacements']:
+                html += f'<li><strong>{item.get("original", "")}</strong> → <span style="color: green;"><strong>{item.get("advanced", "")}</strong></span><br/><small>{item.get("reason", "")} | 例: {item.get("example", "")}</small></li>'
+            html += '</ul>'
+        
+        connector = vocab_polish.get('connector_optimization', {})
+        if connector:
+            html += '<h4>🔗 连接词优化</h4>'
+            html += f'<p><small>{connector.get("current_overuse", "")}</small></p>'
+            recommendations = connector.get('recommendations', {})
+            if recommendations:
+                html += '<ul>'
+                for rel_type, connectors in recommendations.items():
+                    if connectors:
+                        html += f'<li><strong>{rel_type}类：</strong> {", ".join(connectors)}</li>'
+                html += '</ul>'
+        
+        # 修订版
+        html += '<h3 style="color: #333; border-bottom: 2px solid #2196F3; padding-bottom: 10px; margin-top: 20px;">📝 修订版本</h3>'
+        revised = result.get('revised_version', '')
+        html += f'<div style="background: #fffacd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 3px;"><p>{revised}</p></div>'
+    
+    html += '</div>'
+    return html
+
 # --- 加载配置 ---
 load_dotenv()
 logger.info("✅ 已加载 .env 文件")
@@ -111,10 +208,11 @@ def eval_translation(src, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [英译汉] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return result
+        return format_report_html(result)
     except Exception as e:
         logger.error(f"❌ [英译汉] 评估失败: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
+        return error_html
 
 def eval_short(topic, stu):
     logger.info("📝 [小作文] 开始评估")
@@ -129,10 +227,11 @@ def eval_short(topic, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [小作文] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return result
+        return format_report_html(result)
     except Exception as e:
         logger.error(f"❌ [小作文] 评估失败: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
+        return error_html
 
 def eval_long(topic, stu):
     logger.info("📝 [大作文] 开始评估")
@@ -147,40 +246,57 @@ def eval_long(topic, stu):
             logger.error(f"❌ 解析失败: {type(pe).__name__}: {repr(pe)}")
             raise
         logger.info(f"✅ [大作文] 评估完成, 分数: {result.get('score', 'N/A')}")
-        return result
+        return format_report_html(result)
     except Exception as e:
         logger.error(f"❌ [大作文] 评估失败: {str(e)}", exc_info=True)
-        return {"error": str(e)}
+        error_html = f'<div style="color: red; padding: 20px; background: #ffebee; border-radius: 5px;"><h3>❌ 评估失败</h3><p>{str(e)}</p></div>'
+        return error_html
 
 # --- WebUI ---
-with gr.Blocks() as ui:
-    gr.Markdown("## 📝 考研英语 AI 批改系统（DeepSeek + LangChain）")
+with gr.Blocks(title="考研英语 AI 批改系统") as ui:
+    gr.Markdown("# 📝 考研英语 AI 批改系统（DeepSeek + LangChain）")
+    gr.Markdown("---")
 
     with gr.Tab("系统检测"):
         gr.Markdown("### 🔍 API 连接测试")
-        test_btn = gr.Button("测试 API 连接")
+        test_btn = gr.Button("测试 API 连接", variant="primary")
         test_output = gr.JSON(label="测试结果")
         test_btn.click(test_api_connection, outputs=test_output)
 
     with gr.Tab("英译汉"):
-        t1 = gr.Textbox(label="原文（英文）", lines=6)
-        t2 = gr.Textbox(label="考生译文（中文）", lines=6)
-        btn = gr.Button("批改")
-        out = gr.JSON()
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### 📖 输入")
+                t1 = gr.Textbox(label="原文（英文）", lines=8, placeholder="请输入要翻译的英文原文")
+                t2 = gr.Textbox(label="考生译文（中文）", lines=8, placeholder="请输入学生的中文翻译")
+                btn = gr.Button("批改", variant="primary", size="lg")
+            with gr.Column():
+                gr.Markdown("### 📋 批改结果")
+                out = gr.HTML(label="批改报告")
         btn.click(eval_translation, [t1, t2], out)
 
     with gr.Tab("小作文"):
-        s1 = gr.Textbox(label="题目", lines=2)
-        s2 = gr.Textbox(label="考生作文", lines=10)
-        btn2 = gr.Button("批改")
-        out2 = gr.JSON()
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### 📖 输入")
+                s1 = gr.Textbox(label="题目", lines=4, placeholder="请输入小作文题目")
+                s2 = gr.Textbox(label="考生作文", lines=12, placeholder="请输入学生的作文（约100词）")
+                btn2 = gr.Button("批改", variant="primary", size="lg")
+            with gr.Column():
+                gr.Markdown("### 📋 批改结果")
+                out2 = gr.HTML(label="批改报告")
         btn2.click(eval_short, [s1, s2], out2)
 
     with gr.Tab("大作文"):
-        l1 = gr.Textbox(label="题目", lines=2)
-        l2 = gr.Textbox(label="考生作文", lines=15)
-        btn3 = gr.Button("批改")
-        out3 = gr.JSON()
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### 📖 输入")
+                l1 = gr.Textbox(label="题目", lines=4, placeholder="请输入大作文题目")
+                l2 = gr.Textbox(label="考生作文", lines=18, placeholder="请输入学生的作文（约250词）")
+                btn3 = gr.Button("批改", variant="primary", size="lg")
+            with gr.Column():
+                gr.Markdown("### 📋 批改结果")
+                out3 = gr.HTML(label="批改报告")
         btn3.click(eval_long, [l1, l2], out3)
 
 ui.launch()
