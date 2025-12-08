@@ -41,6 +41,7 @@ it 做形式主语
 指示代词
 （2）重点单词意思的确定
 词义确定
+熟词生义
 固定习语语法现象
 
 下面给出几个往年的翻译题目与范文，供你参考：
@@ -53,7 +54,7 @@ No one knows for sure when poetry began, but it has been around for thousands of
 诗歌是有力量的。它的能量和节奏可以吸引读者，将他们带到另一个世界，让他们以不同的方式看待事物。通过字斟句酌地推敲诗句，诗歌可以是戏剧性的、有趣的、美丽的、动人的和鼓舞人心的。
 没有人确切地知道诗歌是什么时候开始的，但它已经存在了数千年，甚至在人们会写字之前就已经出现。诗歌是一种讲述故事和传承历史的方式。它与歌曲密切相关，人们写诗，通常也是为了大声朗诵表演而创作的。诗歌朗诵出来才真正生动起来。这也有助于理解它们，因为此时单词的节奏和发音变得更加清晰。
 
-2024
+2022
 Although we try our best, sometimes our paintings rarely turn out as originally planned! Changes in the light, the limitations of your palette, and simple lack of experience and technique mean that what you start out trying to achieve sometimes doesn't come to life the way you expected.
 Although this can be frustrating and disappointing, it turns out that this can actually be good for you! Unexpected results have two benefits: for starters, you quickly learn to deal with disappointment, and in time (often through repeated error) you realise that when one door closes, another opens. You learn to adapt and come up with creative solutions to the problems the painting presents, and this means that thinking outside the box becomes second nature to the painter.
 Creative problem-solving skills are incredibly useful in daily life, and mean you’re more likely to be able to quickly come up with a solution when a problem arises.
@@ -85,7 +86,7 @@ Farmers' markets are usually weekly or monthly events, most often with outdoor s
 考生译文：
 {student_text}
 
-仅返回 JSON。
+仅返回 JSON。将每一处扣分依据反映在 JSON 的 "errors" 字段中。
 """
 
 translation_prompt = PromptTemplate(
