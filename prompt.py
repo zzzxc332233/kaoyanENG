@@ -86,7 +86,7 @@ Farmers' markets are usually weekly or monthly events, most often with outdoor s
 考生译文：
 {student_text}
 
-仅返回 JSON。将每一处扣分依据反映在 JSON 的 "errors" 字段中。
+仅返回 JSON。将每一处扣分依据与扣分明细反映在 JSON 的 "errors" 字段中。
 """
 
 translation_prompt = PromptTemplate(
@@ -370,7 +370,7 @@ long_template = """
 表达地道性：是否避免直译和明显中式表达。
 评分参考：
 词汇丰富，搭配自然，表达地道，语域正式得体。
-大部分表达自然，偶有不当搭配或轻微中式表达。
+大部分表达自然，偶有不当搭配或轻微中式表达。（注意，有些比较复杂、英语口语中已不经常出现的表达，如独立主格，不应算作中式表达，即使可能是考生对语言运用的不恰当堆砌，这种多样性尝试也应鼓励）
 词汇单调，存在中式表达或语域欠妥。
 语言生硬，直译痕迹重，语域不合适。表达大量不当，不符合英语习惯。
 4. 结构与连贯性（该板块总体折算 3.75 分）
